@@ -1,0 +1,33 @@
+<?php $featured_specs = get_field('community_specs');
+
+if ($featured_specs): ?>
+    <div class="trilister" style="">
+        <?php foreach ($featured_specs as $spec):
+
+            // Check if the ACF field 'status' is true for the current post
+            $status = get_field('status', $spec);
+            if ($status === true): // Assuming 'status' is a true/false ACF field
+
+                // Setup this post for WP functions (variable must be named $post).
+                setup_postdata($spec); ?>
+                <div class="indispec">
+                    <div class="specheaderimage" style="background-image: url('<?php echo get_field('spec_header_image', $spec); ?>');">
+                        <?php if ($home_promo_callout = get_field('home_promo_callout', $spec)) : ?>
+                            <div class="promogreen">
+                                <span><?php echo get_field('home_promo_callout', $spec); ?></span>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <h3><?php echo get_the_title($spec); ?></h3>
+                    <h4>Homesite <?php echo get_field('homesite_number', $spec); ?></h4>
+                    <span><?php echo get_field('price_of_home', $spec); ?></span>
+                    <span><?php echo get_field('floorplan_square_footage', $spec); ?> Sq. Ft. | <?php echo get_field('floorplan_bedrooms', $spec); ?> BD, <?php echo get_field('floorplan_bathrooms', $spec); ?> BA</span>
+                    <a href="<?php the_permalink($spec); ?>">See More </a>
+                </div>
+            <?php endif;
+        endforeach; ?>
+    </div>
+    <?php
+    // Reset the global post object so that the rest of the page works correctly.
+    wp_reset_postdata();
+endif;
