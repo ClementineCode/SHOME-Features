@@ -1,0 +1,275 @@
+<?php     // Query the neighborhood posts
+    $neighborhoods = new WP_Query(array(
+        'post_type' => 'neighborhood',
+        'posts_per_page' => -1,
+    ));
+
+    if ($neighborhoods->have_posts()) :
+        ?>
+        <!-- Map container with two sections: the map and the post list -->
+        <div class="map-container">
+            <!-- Section for displaying the map -->
+            <div id="neighborhood-map"></div>
+
+            <!-- Section for displaying the list of neighborhoods -->
+            <div id="post-list">
+                <ul class="flexnbh">
+                    <?php
+                    while ($neighborhoods->have_posts()) : $neighborhoods->the_post();
+                        $location = get_field('map_data_neighborhood'); // Update with your ACF field name
+
+                        if ($location && isset($location['lat']) && isset($location['lng'])) :
+                            ?>
+                            <!-- List item representing a neighborhood -->
+                            <li data-lat="<?php echo esc_attr($location['lat']); ?>" data-lng="<?php echo esc_attr($location['lng']); ?>" class="indiboj">
+								<div><div class="titlemap"><?php the_title(); ?></div>
+		   <h5>
+			  <?php the_field('location_name'); ?>
+		  </h5>
+		  	   <h5>
+			  <?php the_field('neighborhood_pricing'); ?>
+		  </h5>
+		  <h5>
+			  <a href="<?php the_permalink(); ?>" class="semo">See More</a>
+		  </h5>
+                                </div>
+                            </li>
+                            <?php
+                        else:
+                            // Log an error if the ACF field is empty or doesn't have lat/lng
+                            error_log('Error: ACF field is empty or missing lat/lng for post ID ' . get_the_ID());
+                        endif;
+                    endwhile;
+                    wp_reset_postdata();
+                    ?>
+                </ul>
+            </div>
+        </div>
+
+        <script>
+            function initMap() {
+                // Load the JSON map style
+                var mapStyle = <?php echo json_encode(json_decode(file_get_contents('https://srhomes.flywheelsites.com/wp-content/themes/Clementine%20Base/stylesmap.json')), JSON_PRETTY_PRINT); ?>;
+
+                // Create a new Google Map instance
+                var map = new google.maps.Map(document.getElementById('neighborhood-map'), {
+                    // Apply the map style
+                    styles: mapStyle
+                });
+
+                var markers = [];
+                var bounds = new google.maps.LatLngBounds(); // Create bounds object to contain all markers
+                var infowindows = []; // Array to store infowindows for each marker
+                var activeMarker = null; // Track the currently active marker
+
+                <?php
+                while ($neighborhoods->have_posts()) : $neighborhoods->the_post();
+                    $location = get_field('map_data_neighborhood'); // Update with your ACF field name
+
+                    if ($location && isset($location['lat']) && isset($location['lng'])) :
+                        ?>
+                        (function () {
+                            // Create a new marker for each neighborhood
+                            var marker = new google.maps.Marker({
+                                position: { lat: <?php echo esc_js($location['lat']); ?>, lng: <?php echo esc_js($location['lng']); ?> },
+                                title: '<?php echo esc_js(get_the_title()); ?>',
+								icon: {
+                                    url: '/wp-content/uploads/2024/01/idleiconsrx.png', // Default marker
+                                    scaledSize: new google.maps.Size(36, 48.74), // Set the size to 24px in height
+                                },
+                                map: map,
+                            });
+
+                            markers.push(marker);
+
+                            // Extend the bounds to include this marker
+                            bounds.extend(marker.getPosition());
+
+                            // Create a new infowindow for each marker
+                            var infowindow = new google.maps.InfoWindow({
+                                content: '<div style="max-width: 250px;height: auto; text-align: center;">' + 
+        '<img src="<?php echo esc_url(get_field("neighborhood_header_image")); ?>" style="max-width: 100%;" />' +
+        '<div style="padding-top: 5px;">' +
+        '<h2 style="text-transform: uppercase; font-size: 18px;"><?php echo esc_js(get_the_title()); ?></h2>' +
+        '</div>' + '<div class="comminfox">' + '<p><?php the_field('location_name'); ?></p>' + '<p><?php the_field('neighborhood_pricing'); ?></p>' + '<br><a href="<?php the_permalink() ?>" style="margin-top:2px; font-weight:700; font-size:17px; cursor: pointer; color: #94795D;">See More</a>' + '</div>' +
+        '</div>',
+                            });
+
+                            infowindows.push(infowindow);
+
+                            // Event listener for list item hover
+                            var listItem = document.querySelector('#post-list ul li[data-lat="<?php echo esc_attr($location['lat']); ?>"][data-lng="<?php echo esc_attr($location['lng']); ?>"]');
+                            if (listItem) {
+                                listItem.addEventListener('mouseover', function () {
+                                    if (activeMarker !== marker) {
+                                        // Show the info window above the hovered marker
+                                        infowindow.open(map, marker);
+                                    }
+                                });
+
+                                listItem.addEventListener('mouseout', function () {
+                                    if (activeMarker !== marker) {
+                                        // Close the info window when not hovering
+                                        infowindow.close();
+                                    }
+                                });
+
+                                listItem.addEventListener('click', function () {
+                                    // Set the center of the map to the clicked marker
+                                    map.setCenter(marker.getPosition());
+
+                                    if (activeMarker) {
+                                        // Close the info window of the previously active marker
+                                        infowindows[markers.indexOf(activeMarker)].close();
+                                    }
+
+                                    // Show the info window above the clicked marker
+                                    infowindow.open(map, marker);
+
+                                    // Set the current marker as active
+                                    activeMarker = marker;
+                                });
+                            }
+
+                            // Event listener for marker click
+                            marker.addListener('click', function () {
+                                if (activeMarker) {
+                                    // Close the info window of the previously active marker
+                                    infowindows[markers.indexOf(activeMarker)].close();
+                                }
+
+                                // Show the info window above the clicked marker
+                                infowindow.open(map, marker);
+
+                                // Set the current marker as active
+                                activeMarker = marker;
+                            });
+
+                        })();
+                        <?php
+                    else:
+                        // Log an error if the ACF field is empty or doesn't have lat/lng
+                        ?>
+                        console.error('Error: ACF field is empty or missing lat/lng for post ID <?php echo esc_js(get_the_ID()); ?>');
+                        <?php
+                    endif;
+                endwhile;
+                wp_reset_postdata();
+                ?>
+
+                // Adjust the map to fit all markers within the bounds
+                map.fitBounds(bounds);
+
+                // Add a listener for the 'zoom_changed' event to prevent zooming too close when there's only one marker
+                google.maps.event.addListener(map, 'zoom_changed', function () {
+                    var zoom = map.getZoom();
+                    if (zoom > 15) {
+                        map.setZoom(15);
+                    }
+                });
+            }
+
+            function loadGoogleMapsScript() {
+                // Dynamically load the Google Maps API script
+                var script = document.createElement('script');
+                script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCS9Xf-uKvL7jYbdSSgu2ONc-AKnmLfyIs&callback=initMap';
+                document.head.appendChild(script);
+            }
+
+            // Load the Google Maps script when the page loads
+            loadGoogleMapsScript();
+        </script>
+
+        <style>
+            /* Styles for the map container and list */
+            .map-container {
+                display: grid;
+                grid-template-columns: 3fr 1fr;
+            }
+			
+			.flexnbh {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+}
+			
+#post-list {
+    background-color: #CBC4BC;
+    padding: 30px;
+}
+			#post-list h5 {
+				font-size: 20px;
+				color: #3B3C37;
+				padding-bottom: 0px;
+				font-weight: 400;
+			}
+				.semo {
+				color: #94795D;
+					font-weight: 500;
+			}
+			
+			.semo:hover {
+				color: white;
+				text-decoration: underline;
+			}
+			
+			.titlemap {
+				color: #473729;
+				padding-bottom: 5px;
+				font-size: 24px;
+font-style: normal;
+font-weight: 500;
+line-height: normal;
+letter-spacing: 0.48px;
+text-transform: uppercase;
+			}
+            #neighborhood-map {
+                height: 650px;
+            }
+			@media (max-width: 981px){
+				 #neighborhood-map {
+                height: 400px;
+            }
+				  .map-container {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+				
+			}
+
+            #post-list {
+                overflow-y: auto;
+            }
+
+            #post-list ul {
+                list-style-type: none;
+                padding: 0;
+            }
+
+            #post-list li {
+                margin-bottom: 10px;
+                cursor: pointer;
+            }
+
+            #post-list li:hover {
+                text-decoration: none;
+            }
+			@media (max-width: 987px){
+    .gm-style-iw-d {
+    max-height: 300px !important;
+    height: 300px !important;
+}
+
+.gm-style-iw.gm-style-iw-c {
+    max-height: 300px !important;
+}
+    
+}
+        </style>
+    <?php
+    endif;
+
+
+// Add the shortcode to display the neighborhood map
+// add_shortcode('neighborhood_map', 'display_neighborhood_map');
